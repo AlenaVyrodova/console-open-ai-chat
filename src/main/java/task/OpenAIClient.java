@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import task.dto.Message;
 import task.dto.Model;
+import task.dto.Role;
 import task.utils.Constant;
 
 import java.io.IOException;
@@ -14,11 +15,13 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Client for communication with Open AI API
  */
 public class OpenAIClient {
+
 
     private final ObjectMapper mapper;
     private final HttpClient httpClient;
@@ -52,81 +55,91 @@ public class OpenAIClient {
      * @return AI message
      */
     public Message postAndPrint(List<Message> messages) throws Exception {
-        // todo:
-        //  1. Collect history and user request.
-        //  2. Create request json body:
-        //  {
-        //    "model": "gpt-4o-mini",
-        //    "messages": [
-        //      {
-        //        "role": "system",
-        //        "content": "You are a helpful assistant."
-        //      },
-        //      {
-        //        "role": "user",
-        //        "content": "What is the capital of France?"
-        //      }
-        //    ],
-        //    "stream": true
-        //  }
-        //  3. Create {@link HttpRequest}, don't forget to add api key and content type
-        //      POST https://api.openai.com/v1/chat/completions
-        //      Authorization: Bearer YOUR_API_KEY
-        //      Content-Type: application/json
-        //  4. Request to Open AI: implement `postRegularAndShowInConsole` and `postAndStreamToConsole`
-        //  5. Collect and print 'data' to console.
-        //  6. Return AI message with collected 'data' content.
 
-        throw new RuntimeException("Not implemented yet");
+        Map<String, Object> requestBody = Map.of(
+                "model", this.model,
+                "messages", messages,
+                "stream", this.streamResponse,
+                "n", 3
+
+        );
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(Constant.OPEN_AI_API_URI)
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + apiKey)
+                .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(requestBody)))
+                .build();
+        StringBuilder aiResp = new StringBuilder();
+        if (streamResponse) {
+            postAndStreamToConsole(httpRequest, aiResp);
+        }else {
+            postRegularAndShowInConsole(httpRequest, aiResp);
+        }
+        return new Message(Role.AI, aiResp.toString());
     }
 
     public void postRegularAndShowInConsole(HttpRequest httpRequest, StringBuilder assistantResponse) {
-        // todo:
-        //  1. Send request using httpClient.send() with:
-        //      - httpRequest as first parameter
-        //      - HttpResponse.BodyHandlers.ofString() as second parameter
-        //  2. Check if response status code is 200:
-        //      If successful (200):
-        //      - Parse response body to JsonNode using mapper.readTree()
-        //      - Get "choices" array from root node
-        //      - If choices exists and is not empty:
-        //          - Extract content from: choices[0].message.content
-        //          - If content is not null:
-        //              * Print content to console using System.out.print()
-        //              * Append content to assistantResponse
-        //      Otherwise:
-        //      - Print status code and response body
-        //  3. Handle IOException and InterruptedException by wrapping in RuntimeException
+        try {
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                JsonNode rootNode = mapper.readTree(response.body());
+                if (rootNode != null) {
+                    rootNode.get("choices");
+                    JsonNode choices = rootNode.get("choices");
+                    if (choices != null && choices.isArray() && !choices.isEmpty()) {
+                        JsonNode message = choices.get(0).get("message");
+                        if (message != null) {
+                            String content = message.get("content").asText();
+                            System.out.println(content);
+                        }
+                    }
+                }
+            } else {
+                System.out.println(response.statusCode() + " " + response.body());
 
-        throw new RuntimeException("Not implemented yet");
+            }
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
     }
 
     public void postAndStreamToConsole(HttpRequest httpRequest, StringBuilder assistantResponse) {
-        // todo:
-        //  1. Send async request using httpClient with line body handler
-        //  2. Process response lines:
-        //      - Check if line starts with "data: "
-        //      - Remove "data: " prefix and trim
-        //      - Skip if line equals "[DONE]"
-        //      - Otherwise collect and print content
-        //  3. Wait for completion with join()
-
-        throw new RuntimeException("Not implemented yet");
+        httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofLines())
+                .thenAccept(response -> {
+                    response.body().forEach(line -> {
+                        if (line != null &&line.startsWith("data: ")) {
+                            String chunk = line.substring(6);
+                            if (!chunk.endsWith("[DONE]")) {
+                                collectAndPrintContent(chunk, assistantResponse);
+                            }
+                        }
+                    });
+                }).join();
     }
 
     public void collectAndPrintContent(String data, StringBuilder assistantResponse) {
-        // todo:
-        //  1. Parse data string to JsonNode using mapper
-        //  2. Extract choices array from root node
-        //  3. Check if choices exists and is not empty
-        //  4. Get delta node from first choice
-        //  5. If delta has content:
-        //      - Extract content token as text
-        //      - Print token to console
-        //      - Append token to assistantResponse
-        //  6. Handle parsing errors with appropriate error messages
 
-        throw new RuntimeException("Not implemented yet");
+        try {
+            JsonNode rootNode =   mapper.readTree(data);
+            if(rootNode!=null){
+                JsonNode choices = rootNode.get("choices");
+                if(choices!=null && choices.isArray()&& !choices.isEmpty())
+                {
+                    JsonNode delta = choices.get(0).get("delta");
+                    if(delta!=null){
+                        JsonNode content = delta.get("content");
+                        if(content!=null){
+                            String cont =content.asText();
+                            assistantResponse.append(cont);
+                            System.out.print(cont);
+                        }
+                    }
+                }
+            }
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
     }
 
 }

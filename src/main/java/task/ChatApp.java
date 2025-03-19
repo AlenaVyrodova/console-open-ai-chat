@@ -1,19 +1,52 @@
 package task;
 
+import task.dto.Conversation;
+import task.dto.Message;
+import task.dto.Model;
+import task.dto.Role;
+import task.utils.Constant;
+
+import java.util.Scanner;
+
 public class ChatApp {
-
     public static void main(String[] args) {
-        //TODO:
-        // 1. Add {@link Scanner} for 'System.in'.
-        // 2. Create instance of 'task.OpenAIClient' with model.
-        // 3. Create Conversation.
-        // 4. Get System prompt from console or use default -> Constant#DEFAULT_SYSTEM_PROMPT
-        // and add to conversation messages. <br>
-        // 5. Use `while` cycle, apply user message from console `scanner.nextLine()` and call openAiClient. <br>
-        // 6. Apply 'Message' from openAiClient to conversation messages. <br>
-        // 7. Don't forget to add 'exit' point from application via console.
+    Scanner scanner = new Scanner(System.in);
+    OpenAIClient openAIClient = new OpenAIClient(Model.GPT_4o_MINI, Constant.API_KEY, true);
+    Conversation conversation = new Conversation();
+        System.out.println("Input system prompt");
+        System.out.println(">");
+    String sysPrompt = scanner.nextLine();
 
-        throw new RuntimeException("Not implemented yet");
+        if (sysPrompt.isBlank()) {
+        conversation.addMessage(new Message(Role.SYSTEM, Constant.DEFAULT_SYSTEM_PROMPT));
+        System.out.printf("Has been used default SYS PROMPT %s %n", Constant.DEFAULT_SYSTEM_PROMPT);
+    } else {
+        conversation.addMessage(new Message(Role.SYSTEM, sysPrompt));
+        System.out.printf(" SYS PROMPT %s %n", sysPrompt);
     }
+        System.out.println();
+        System.out.println("Please, type your question or question to quit");
+        while (true) {
+        System.out.println(">");
+        String input = scanner.nextLine();
+        if (input.equalsIgnoreCase("exit")) {
+            System.out.println("Exiting.......");
+            break;
+        }
+        conversation.addMessage(new Message(Role.USER, input));
+        System.out.print("AI: ");
+        try {
+            Message message = openAIClient.postAndPrint(conversation.getMessages());
+            conversation.addMessage(message);
+            System.out.print(message.content());
 
+        } catch (Exception e) {
+            e.printStackTrace();
+            scanner.close();
+            throw new RuntimeException(e);
+        }
+        System.out.println();
+    }
+        scanner.close();
+}
 }

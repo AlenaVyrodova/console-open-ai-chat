@@ -10,18 +10,26 @@ public enum Role {
     // - SYSTEM should represent "system"
     // - USER should represent "user"
     // - AI should represent "assistant"
-    ;
+    SYSTEM("system"),
+    USER("user"),
+    AI("assistant");
 
     // TODO: Add private final field to store the string value
-    // private final String value;
+    private final String value;
 
     // TODO: Create constructor that accepts string value parameter
-    // Role(String value) {
-    //     this.value = value;
-    // }
+    Role(String value) {
+        this.value = value;
+    }
 
     // TODO: Create getter method for the string value
     // - Method should be public and return String
     // - Add @JsonValue annotation for proper JSON serialization
     // - Method should return the stored string value
+
+    @JsonValue
+    public String getValue() {
+        return value;
+
+    }
 }
